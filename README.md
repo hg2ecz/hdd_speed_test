@@ -5,5 +5,5 @@ $ ./target/release/hdd-speed-test -h
 
 $ ./target/release/hdd-speed-test -s 8192 -r
 
-rm tesztfile.dat
+$ rm tesztfile.dat
 ```

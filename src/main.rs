@@ -77,7 +77,7 @@ fn main() {
     };
     let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
     println!(
-        "{:.3} GB hosszú fájl és {number} alkalmommal beleírva 4k",
+        "{:.2} GB hosszú fájl és {number} alkalmommal beleírva 4k",
         fvec.len() as f64 / 1024. / 1024. / 1024.
     );
 

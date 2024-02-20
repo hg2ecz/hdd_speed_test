@@ -1,7 +1,7 @@
 /* Krüpl Zsolt, 2023. jun */
 
 use clap::{Arg, ArgAction, Command};
-use memmap::MmapOptions;
+use memmap::{MmapMut, MmapOptions};
 use rand::prelude::*;
 use std::fs::File;
 use std::io::Write;
@@ -80,9 +80,59 @@ fn newfile(fname: &str, size_mb: u64) -> File {
     file
 }
 
+fn speedtest(fvec: &mut MmapMut, number: u32, readwrite: bool, async_opt: bool) {
+    // write 4k in random place
+    let mut rng = rand::thread_rng();
+    let mut rndvec: Vec<usize> = vec![];
+    for _ in 0..number {
+        rndvec.push(rng.gen_range(0..fvec.len() / 4096));
+    }
+
+    let start = time::Instant::now();
+    if readwrite {
+        // read and write
+        for rndnum in rndvec {
+            let fill = ((rndnum as u32) << 4) + 1;
+            for i in 0..1024 {
+                let stval = ((fvec[rndnum * 4096 + 4 * i] as u32) << 24)
+                    + ((fvec[rndnum * 4096 + 4 * i + 1] as u32) << 16)
+                    + ((fvec[rndnum * 4096 + 4 * i + 2] as u32) << 8)
+                    + (fvec[rndnum * 4096 + 4 * i + 3] as u32)
+                    + fill;
+                fvec[rndnum * 4096 + 4 * i] = (stval >> 24) as u8;
+                fvec[rndnum * 4096 + 4 * i + 1] = (stval >> 16) as u8;
+                fvec[rndnum * 4096 + 4 * i + 2] = (stval >> 8) as u8;
+                fvec[rndnum * 4096 + 4 * i + 3] = stval as u8;
+            }
+            if !async_opt {
+                fvec.flush().unwrap();
+            }
+        }
+    } else {
+        // write only
+        for rndnum in rndvec {
+            let fill = ((rndnum as u32) << 4) + 1;
+            for i in 0..1024 {
+                fvec[rndnum * 4096 + 4 * i] = (fill >> 24) as u8;
+                fvec[rndnum * 4096 + 4 * i + 1] = (fill >> 16) as u8;
+                fvec[rndnum * 4096 + 4 * i + 2] = (fill >> 8) as u8;
+                fvec[rndnum * 4096 + 4 * i + 3] = fill as u8;
+            }
+            if !async_opt {
+                fvec.flush().unwrap();
+            }
+        }
+    }
+    fvec.flush().unwrap();
+    let difftime = time::Instant::now() - start;
+    println!(
+        "{:.3} msec/4k block írás",
+        difftime.as_micros() as f64 / 1000. / number as f64
+    );
+}
+
 fn main() {
     let arg = argument_parser();
-    let mut rng = rand::thread_rng();
     let file = if let Ok(file) = File::options().read(true).write(true).open(FNAME) {
         if file.metadata().unwrap().len() == 1024 * 1024 * arg.mbyte {
             file
@@ -94,45 +144,13 @@ fn main() {
     };
     // memmap
     let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
+
     println!(
         "{:.2} GB hosszú fájl és {} alkalommal beleírva 4k",
         fvec.len() as f64 / 1024. / 1024. / 1024.,
         arg.number
     );
 
-    // write 4k in random place
-    let mut rndvec: Vec<usize> = vec![];
-    for _ in 0..arg.number {
-        rndvec.push(rng.gen_range(0..arg.mbyte as usize * 1024 / 4));
-    }
-
-    let start = time::Instant::now();
-    if arg.readwrite {
-        // read and write
-        for rndnum in rndvec {
-            for i in 0..4096 {
-                fvec[rndnum * 4096 + i] += rndnum as u8;
-            }
-            if !arg.async_opt {
-                fvec.flush().unwrap();
-            }
-        }
-    } else {
-        // write only
-        for rndnum in rndvec {
-            for i in 0..4096 {
-                fvec[rndnum * 4096 + i] = rndnum as u8;
-            }
-            if !arg.async_opt {
-                fvec.flush().unwrap();
-            }
-        }
-    }
-    fvec.flush().unwrap();
-    let difftime = time::Instant::now() - start;
-
-    println!(
-        "{:.3} msec/4k block írás",
-        difftime.as_micros() as f64 / 1000. / arg.number as f64
-    );
+    // Run test
+    speedtest(&mut fvec, arg.number, arg.readwrite, arg.async_opt);
 }

@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Write;
 use std::time;
 
-const FNAME: &str = "tesztfile.dat";
+const FNAME: &str = "testfile.dat";
 
 struct Arguments {
     mbyte: u64,
@@ -17,15 +17,18 @@ struct Arguments {
 }
 
 fn argument_parser() -> Arguments {
-    let matches = Command::new("Filesystem RW test.")
-        .version("Version: 0.1.0")
+    let matches = Command::new("Filesystem 4 kbyte RW test.")
+        .author("Zsolt Krüpl, hg2ecz@ham.hu")
+        .version("Version: 0.2.0")
         .arg(
             Arg::new("size")
                 .short('s')
                 .long("size")
+                .default_value("1000")
                 .value_parser(clap::value_parser!(u64))
                 .action(ArgAction::Set)
-                .help("Size in MB (default 1024)"),
+                .help("Testfile size in MB (default 1024)")
+                .required(true),
         )
         .arg(
             Arg::new("async")
@@ -45,6 +48,7 @@ fn argument_parser() -> Arguments {
             Arg::new("number")
                 .short('n')
                 .long("number")
+                .default_value("1000")
                 .value_parser(clap::value_parser!(u32))
                 .action(ArgAction::Set)
                 .help("Number of test (default: 1000)"),
@@ -52,10 +56,10 @@ fn argument_parser() -> Arguments {
         .get_matches();
 
     Arguments {
-        mbyte: *matches.get_one("size").unwrap_or(&1024),
-        async_opt: *matches.get_one("async").unwrap_or(&false),
-        readwrite: *matches.get_one("readwrite").unwrap_or(&false),
-        number: *matches.get_one("number").unwrap_or(&1000),
+        mbyte: *matches.get_one("size").unwrap(),
+        async_opt: *matches.get_one("async").unwrap(),
+        readwrite: *matches.get_one("readwrite").unwrap(),
+        number: *matches.get_one("number").unwrap(),
     }
 }
 
@@ -88,6 +92,7 @@ fn main() {
     } else {
         newfile(FNAME, arg.mbyte)
     };
+    // memmap
     let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
     println!(
         "{:.2} GB hosszú fájl és {} alkalommal beleírva 4k",
@@ -95,29 +100,39 @@ fn main() {
         arg.number
     );
 
-    // rnd helyen 4 kByte-ot írunk j alkalommal és megmérjük az idejét.
+    // write 4k in random place
+    let mut rndvec: Vec<usize> = vec![];
+    for _ in 0..arg.number {
+        rndvec.push(rng.gen_range(0..arg.mbyte as usize * 1024 / 4));
+    }
+
     let start = time::Instant::now();
-    for j in 0..arg.number {
-        let rndnum: usize = rng.gen_range(0..arg.mbyte as usize * 1024 / 4);
-        if arg.readwrite {
-            // hozzáadjuk
+    if arg.readwrite {
+        // read and write
+        for rndnum in rndvec {
             for i in 0..4096 {
-                fvec[rndnum * 4096 + i] += j as u8;
+                fvec[rndnum * 4096 + i] += rndnum as u8;
             }
-        } else {
-            // csak írjuk
-            for i in 0..4096 {
-                fvec[rndnum * 4096 + i] = j as u8;
+            if !arg.async_opt {
+                fvec.flush().unwrap();
             }
         }
-        if !arg.async_opt {
-            // kiírjuk!
-            fvec.flush().unwrap();
+    } else {
+        // write only
+        for rndnum in rndvec {
+            for i in 0..4096 {
+                fvec[rndnum * 4096 + i] = rndnum as u8;
+            }
+            if !arg.async_opt {
+                fvec.flush().unwrap();
+            }
         }
     }
-    let diff = time::Instant::now() - start;
+    fvec.flush().unwrap();
+    let difftime = time::Instant::now() - start;
+
     println!(
         "{:.3} msec/4k block írás",
-        diff.as_micros() as f64 / 1000. / arg.number as f64
+        difftime.as_micros() as f64 / 1000. / arg.number as f64
     );
 }

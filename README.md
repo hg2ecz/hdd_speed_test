@@ -4,9 +4,9 @@ $ cargo build --release
 $ ./target/release/hdd-speed-test -h
 
 $ ./target/release/hdd-speed-test -s 8192 -r   # first run, create file
-$ ./target/release/hdd-speed-test -s 8192 -r   # test
+$ ./target/release/hdd-speed-test -s 8192 -r   # only test (file exist)
 
-$ rm tesztfile.dat
+$ rm testfile.dat
 ```
 
 Measured values:

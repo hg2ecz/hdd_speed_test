@@ -1,4 +1,11 @@
 # HDD random 4k write test with sync
+
+**How does it work?**
+
+* create a file with size length
+* rewrite random 4 kbyte in file (or readwrite)
+* measure the time:  ```time(N * [4kbyte (rd)wr & sync]) / N``` is the time of the rewriting of 4kbyte block
+
 ```
 $ cargo build --release
 $ ./target/release/hdd-speed-test -h

@@ -17,4 +17,4 @@ Measured values:
     * ext4: **0.067** msec / 4k   (-n 10000)
   * 7,68 TB U.2 (KINGSTON SEDC1500M7680G) software raid1  (CPU: Xeon(R) Silver 4116)
     * ext4: **0,051** msec / 4k
-    * btrfs: **0,62** msec / 4k (copy on write filesystem)
+    * btrfs: **0,620** msec / 4k (copy on write filesystem)

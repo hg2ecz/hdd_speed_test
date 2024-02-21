@@ -126,7 +126,10 @@ fn speedtest(fvec: &mut MmapMut, number: u32, readwrite: bool, async_opt: bool) 
     fvec.flush().unwrap();
     let difftime = time::Instant::now() - start;
     let msec_4k = difftime.as_micros() as f64 / 1000. / number as f64;
-    println!("--> {:.3} msec/4k block write", msec_4k);
+    println!(
+        "--> {msec_4k:.3} msec/4k block write (iops: {:.1})",
+        1000. / msec_4k
+    );
 }
 
 fn main() {

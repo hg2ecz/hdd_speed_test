@@ -5,6 +5,10 @@
 * create a file with size length
 * rewrite random 4 kbyte in file (or readwrite, -r)
 * measure the time:  ```time(N * [4kbyte (rd)wr & sync]) / N``` is the time of the rewriting of 4kbyte block
+* the intermediate sync can be skipped (-a), the sync will be at the end of all rewrite.
+* see --help
+
+**Build and running**
 
 ```
 $ cargo build --release

@@ -125,14 +125,13 @@ fn speedtest(fvec: &mut MmapMut, number: u32, readwrite: bool, async_opt: bool) 
     }
     fvec.flush().unwrap();
     let difftime = time::Instant::now() - start;
-    println!(
-        "{:.3} msec/4k block írás",
-        difftime.as_micros() as f64 / 1000. / number as f64
-    );
+    let msec_4k = difftime.as_micros() as f64 / 1000. / number as f64;
+    println!("--> {:.3} msec/4k block write", msec_4k);
 }
 
 fn main() {
     let arg = argument_parser();
+    let mut mbps = 0.0;
     let file = if let Ok(file) = File::options().read(true).write(true).open(FNAME) {
         if file.metadata().unwrap().len() == 1024 * 1024 * arg.mbyte {
             file
@@ -140,17 +139,25 @@ fn main() {
             newfile(FNAME, arg.mbyte)
         }
     } else {
-        newfile(FNAME, arg.mbyte)
+        unsafe { libc::sync() };
+        let start = time::Instant::now();
+        let file = newfile(FNAME, arg.mbyte);
+        let difftime = time::Instant::now() - start;
+        mbps = arg.mbyte as f64 / difftime.as_micros() as f64 * 1_000_000.;
+        file
     };
     // memmap
     let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
-
+    let print_len = fvec.len() as f64 / 1024. / 1024. / 1024.;
     println!(
-        "{:.2} GB hosszú fájl és {} alkalommal beleírva 4k",
-        fvec.len() as f64 / 1024. / 1024. / 1024.,
+        "File length: {print_len:.2} GB, number of random position 4kbyte test: {}",
         arg.number
     );
-
+    if mbps > 0.0 {
+        println!("--> Linear write: {:.2} Mbyte/s", mbps);
+    } else {
+        println!("--> Linear write: file already exists");
+    }
     // Run test
     speedtest(&mut fvec, arg.number, arg.readwrite, arg.async_opt);
 }

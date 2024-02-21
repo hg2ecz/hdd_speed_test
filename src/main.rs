@@ -150,7 +150,7 @@ fn main() {
     let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
     let print_len = fvec.len() as f64 / 1024. / 1024. / 1024.;
     println!(
-        "File length: {print_len:.2} GB, number of random position 4kbyte test: {}",
+        "\nFile length: {print_len:.2} GB, number of random position 4kbyte test: {}",
         arg.number
     );
     if mbps > 0.0 {

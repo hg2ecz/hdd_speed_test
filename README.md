@@ -10,7 +10,7 @@ $ rm testfile.dat                              # at the end of tests, remove man
 ```
 
 Measured values:
-  * 4 TB HDD software raid1
+  * 4 TB HDD (WD40EZRX) software raid1
      * ext4: **23.18** msec/4k (first part of disk) and **48.80** msec/4k (last part of disk)
      * btrfs: **???** msec/4k (first part of disk) and **167.80** msec/4k (last part of disk)
   * 960 GB SATA (KINGSTON SEDC600) software raid 1 (CPU: Xeon(R) Silver 4116)

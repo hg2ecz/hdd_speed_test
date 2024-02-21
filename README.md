@@ -3,7 +3,7 @@
 **How does it work?**
 
 * create a file with size length
-* rewrite random 4 kbyte in file (or readwrite (-r))
+* rewrite random 4 kbyte in file (or readwrite, -r)
 * measure the time:  ```time(N * [4kbyte (rd)wr & sync]) / N``` is the time of the rewriting of 4kbyte block
 
 ```

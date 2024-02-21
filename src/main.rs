@@ -24,7 +24,7 @@ fn argument_parser() -> Arguments {
             Arg::new("size")
                 .short('s')
                 .long("size")
-                .default_value("1000")
+                .default_value("1024")
                 .value_parser(clap::value_parser!(u64))
                 .action(ArgAction::Set)
                 .help("Testfile size in MB")

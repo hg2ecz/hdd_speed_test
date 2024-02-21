@@ -27,7 +27,7 @@ fn argument_parser() -> Arguments {
                 .default_value("1000")
                 .value_parser(clap::value_parser!(u64))
                 .action(ArgAction::Set)
-                .help("Testfile size in MB (default 1024)")
+                .help("Testfile size in MB")
                 .required(true),
         )
         .arg(
@@ -157,9 +157,9 @@ fn main() {
         arg.number
     );
     if mbps > 0.0 {
-        println!("--> Linear write: {:.2} Mbyte/s", mbps);
+        println!("--> Linear write: {:.2} Mbyte/s  ({FNAME})", mbps);
     } else {
-        println!("--> Linear write: file already exists");
+        println!("--> Linear write: file already exists ({FNAME})");
     }
     // Run test
     speedtest(&mut fvec, arg.number, arg.readwrite, arg.async_opt);

@@ -95,9 +95,22 @@ fn newfile(fname: &str, filesize: u64) -> File {
         .write(true)
         .open(fname)
         .unwrap();
-    let data = [0u8; CHUNKSIZE as usize];
-    for _ in 0..filesize / CHUNKSIZE {
-        file.write_all(&data).unwrap();
+    let data_1m = [0u8; 1024 * 1024];
+    let data_128k = [0u8; 128 * 1024];
+    let data_chunk = [0u8; CHUNKSIZE as usize];
+
+    let mut remain = filesize as usize;
+    while remain >= data_1m.len() {
+        file.write_all(&data_1m).unwrap();
+        remain -= data_1m.len();
+    }
+    while remain >= data_128k.len() {
+        file.write_all(&data_128k).unwrap();
+        remain -= data_128k.len();
+    }
+    while remain >= data_chunk.len() {
+        file.write_all(&data_chunk).unwrap();
+        remain -= data_chunk.len();
     }
     file.flush().unwrap();
     unsafe { libc::sync() };
@@ -143,17 +156,10 @@ fn speedtest_testfunc(fvec: &mut MmapMut, rndvec: &[usize], readwrite: bool, asy
     fvec.flush().unwrap();
 }
 
-// --- MAIN ---
-
-fn main() {
-    let arg = argument_parser();
-    std::fs::create_dir_all(DIRNAME).unwrap();
-    let chunk_number = 1024 * 1024 * arg.mbyte / CHUNKSIZE;
-    let filesize = CHUNKSIZE * (chunk_number / arg.threadnums);
-
+fn create_files(filesize: u64, threadnums: u64) -> Option<f64> {
     // create files for tests
     let mut children = vec![];
-    for i in 0..arg.threadnums {
+    for i in 0..threadnums {
         children.push(thread::spawn(move || -> f64 {
             let mut mbps = 0.0;
             let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
@@ -181,22 +187,31 @@ fn main() {
         }
         mbps += mbps_x;
     }
+    if mbps_ok {
+        Some(mbps)
+    } else {
+        None
+    }
+}
 
+fn random_write_test(filesize: u64, arg: &Arguments) -> (usize, f64) {
+    let chunk_number = filesize / CHUNKSIZE;
     // write 4k in random place
     let mut rng = rand::thread_rng();
-    let mut rndvec: Vec<usize> = vec![];
-    // let chunkusize = CHUNKSIZE as usize;
+    let mut rndvec_common: Vec<usize> = vec![];
     for _ in 0..arg.wrnum / arg.threadnums as u32 {
-        rndvec.push(rng.gen_range(0..(chunk_number / arg.threadnums) as usize));
+        rndvec_common.push(rng.gen_range(0..chunk_number as usize));
     }
 
     // Run test
+    let readwrite = arg.readwrite;
+    let async_opt = arg.async_opt;
     let mut children = vec![];
     let start = time::Instant::now();
     for i in 0..arg.threadnums {
-        let rndvec = rndvec.clone();
+        let rndvec = rndvec_common.clone();
         let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
-        children.push(thread::spawn(move || -> f64 {
+        children.push(thread::spawn(move || -> usize {
             let file = if let Ok(file) = File::options().read(true).write(true).open(&dirfilename) {
                 if file.metadata().unwrap().len() == filesize {
                     file
@@ -210,22 +225,47 @@ fn main() {
             };
             // memmap
             let mut fvec = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
-            speedtest_testfunc(&mut fvec, &rndvec, arg.readwrite, arg.async_opt);
-            fvec.len() as f64
+            speedtest_testfunc(&mut fvec, &rndvec, readwrite, async_opt);
+            fvec.len()
         }));
     }
     // join
-    let sum_len: f64 = children.into_iter().map(|c| c.join().unwrap()).sum();
+    let sum_len: usize = children.into_iter().map(|c| c.join().unwrap()).sum();
 
     let difftime = time::Instant::now() - start;
     let msec_4k = difftime.as_micros() as f64 / 1000. / arg.wrnum as f64; // !!!
+    (sum_len, msec_4k)
+}
+
+fn remove_tmp_files(threadnums: u64) {
+    println!("Takarít -> {DIRNAME}");
+    for i in 0..threadnums {
+        let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
+        if fs::remove_file(&dirfilename).is_err() {
+            eprintln!("Remove error: {dirfilename} not exists!");
+        }
+    }
+    if std::fs::remove_dir(DIRNAME).is_err() {
+        eprintln!("--- Directory {DIRNAME} is not empty. Please remove manually! ---");
+    }
+}
+
+fn main() {
+    let arg = argument_parser();
+    std::fs::create_dir_all(DIRNAME).unwrap();
+
+    let chunk_number = 1024 * 1024 * arg.mbyte / CHUNKSIZE;
+    let filesize = CHUNKSIZE * (chunk_number / arg.threadnums);
+
+    let mbps_opt = create_files(filesize, arg.threadnums);
+    let (sum_len, msec_4k) = random_write_test(filesize, &arg);
 
     println!(
         "\nFile length (sum): {:.2} GB, wrnum of random position 4kbyte test: {}",
-        sum_len / 1024. / 1024. / 1024.,
+        sum_len as f64 / 1024. / 1024. / 1024.,
         (arg.wrnum / arg.threadnums as u32) * arg.threadnums as u32
     );
-    if mbps_ok {
+    if let Some(mbps) = mbps_opt {
         println!("--> Linear write: {:.2} Mbyte/s  ({DIRNAME}/*)", mbps);
     } else {
         println!("--> Linear write: file already exists ({DIRNAME}/*)");
@@ -236,15 +276,6 @@ fn main() {
     );
 
     if !arg.keepfiles {
-        println!("Takarít -> {DIRNAME}");
-        for i in 0..arg.threadnums {
-            let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
-            if fs::remove_file(&dirfilename).is_err() {
-                eprintln!("Remove error: {dirfilename} not exists!");
-            }
-        }
-        if std::fs::remove_dir(DIRNAME).is_err() {
-            eprintln!("--- Directory {DIRNAME} is not empty. Please remove manually! ---");
-        }
+        remove_tmp_files(arg.threadnums);
     }
 }

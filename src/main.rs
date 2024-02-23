@@ -1,5 +1,3 @@
-/* Krüpl Zsolt, 2023. jun */
-
 use clap::{Arg, ArgAction, Command};
 use memmap::{MmapMut, MmapOptions};
 use rand::prelude::*;
@@ -25,7 +23,7 @@ struct Arguments {
 fn argument_parser() -> Arguments {
     let matches = Command::new("Filesystem 4 kbyte RW test.")
         .author("Zsolt Krüpl, hg2ecz@ham.hu")
-        .version("Version: 0.2.0")
+        .version("Version: 0.3.0")
         .arg(
             Arg::new("size")
                 .short('s')
@@ -260,11 +258,10 @@ fn main() {
     let mbps_opt = create_files(filesize, arg.threadnums);
     let (sum_len, msec_4k) = random_write_test(filesize, &arg);
 
-    println!(
-        "\nFile length (sum): {:.2} GB, wrnum of random position 4kbyte test: {}",
-        sum_len as f64 / 1024. / 1024. / 1024.,
-        (arg.wrnum / arg.threadnums as u32) * arg.threadnums as u32
-    );
+    println!("\nTotal testfile lenghts: {:.2} GB, {} pcs in total of random position {}kbyte test in {} threads.",
+        sum_len as f64 / 1024. / 1024. / 1024., (arg.wrnum / arg.threadnums as u32) * arg.threadnums as u32,
+        CHUNKSIZE / 1024, arg.threadnums);
+
     if let Some(mbps) = mbps_opt {
         println!("--> Linear write: {:.2} Mbyte/s  ({DIRNAME}/*)", mbps);
     } else {

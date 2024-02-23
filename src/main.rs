@@ -11,6 +11,9 @@ const FILENAME: &str = "testfile.dat";
 const CHUNK_N_4K: u64 = 1;
 const CHUNKSIZE: u64 = 4096 * CHUNK_N_4K;
 
+const FILLDATA: [u8; 128 * 1024] = [0; 128 * 1024];
+const FILLCHUNK: [u8; CHUNKSIZE as usize] = [0; CHUNKSIZE as usize];
+
 struct Arguments {
     mbyte: u64,
     async_opt: bool,
@@ -93,22 +96,15 @@ fn newfile(fname: &str, filesize: u64) -> File {
         .write(true)
         .open(fname)
         .unwrap();
-    let data_1m = [0u8; 1024 * 1024];
-    let data_128k = [0u8; 128 * 1024];
-    let data_chunk = [0u8; CHUNKSIZE as usize];
 
     let mut remain = filesize as usize;
-    while remain >= data_1m.len() {
-        file.write_all(&data_1m).unwrap();
-        remain -= data_1m.len();
+    while remain >= FILLDATA.len() {
+        file.write_all(&FILLDATA).unwrap();
+        remain -= FILLDATA.len();
     }
-    while remain >= data_128k.len() {
-        file.write_all(&data_128k).unwrap();
-        remain -= data_128k.len();
-    }
-    while remain >= data_chunk.len() {
-        file.write_all(&data_chunk).unwrap();
-        remain -= data_chunk.len();
+    while remain >= FILLCHUNK.len() {
+        file.write_all(&FILLCHUNK).unwrap();
+        remain -= FILLCHUNK.len();
     }
     file.flush().unwrap();
     unsafe { libc::sync() };
@@ -193,15 +189,13 @@ fn create_files(filesize: u64, threadnums: u64) -> Option<f64> {
 }
 
 fn random_write_test(filesize: u64, arg: &Arguments) -> (usize, f64) {
-    let chunk_number = filesize / CHUNKSIZE;
-    // write 4k in random place
     let mut rng = rand::thread_rng();
     let mut rndvec_common: Vec<usize> = vec![];
+    let chunk_number = filesize / CHUNKSIZE;
     for _ in 0..arg.wrnum / arg.threadnums as u32 {
         rndvec_common.push(rng.gen_range(0..chunk_number as usize));
     }
 
-    // Run test
     let readwrite = arg.readwrite;
     let async_opt = arg.async_opt;
     let mut children = vec![];
@@ -236,7 +230,7 @@ fn random_write_test(filesize: u64, arg: &Arguments) -> (usize, f64) {
 }
 
 fn remove_tmp_files(threadnums: u64) {
-    println!("Takarít -> {DIRNAME}");
+    // println!("Remove tmp files -> {DIRNAME}");
     for i in 0..threadnums {
         let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
         if fs::remove_file(&dirfilename).is_err() {
@@ -274,5 +268,8 @@ fn main() {
 
     if !arg.keepfiles {
         remove_tmp_files(arg.threadnums);
+    } else {
+        println!("TMP files remains in {DIRNAME} directory. Please remove manually.");
     }
+    println!();
 }

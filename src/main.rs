@@ -253,6 +253,12 @@ fn main() {
     let arg = argument_parser();
     std::fs::create_dir_all(DIRNAME).unwrap();
 
+    ctrlc::set_handler(move || {
+        remove_tmp_files(arg.threadnums);
+        std::process::exit(-1);
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let chunk_number = 1024 * 1024 * arg.mbyte / CHUNKSIZE;
     let filesize = CHUNKSIZE * (chunk_number / arg.threadnums);
 

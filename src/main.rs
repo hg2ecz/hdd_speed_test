@@ -11,9 +11,6 @@ const FILENAME: &str = "testfile.dat";
 const CHUNK_N_4K: u64 = 1;
 const CHUNKSIZE: u64 = 4096 * CHUNK_N_4K;
 
-const FILLDATA: [u8; 128 * 1024] = [0; 128 * 1024];
-const FILLCHUNK: [u8; CHUNKSIZE as usize] = [0; CHUNKSIZE as usize];
-
 struct Arguments {
     mbyte: u64,
     async_opt: bool,
@@ -88,7 +85,7 @@ fn argument_parser() -> Arguments {
     }
 }
 
-fn newfile(fname: &str, filesize: u64) -> File {
+fn newfile(fname: &str, filesize: u64, filldata: &[u8], fillchunk: &[u8]) -> File {
     let mut file = File::options()
         .create(true)
         .truncate(true)
@@ -98,13 +95,13 @@ fn newfile(fname: &str, filesize: u64) -> File {
         .unwrap();
 
     let mut remain = filesize as usize;
-    while remain >= FILLDATA.len() {
-        file.write_all(&FILLDATA).unwrap();
-        remain -= FILLDATA.len();
+    while remain >= filldata.len() {
+        file.write_all(filldata).unwrap();
+        remain -= filldata.len();
     }
-    while remain >= FILLCHUNK.len() {
-        file.write_all(&FILLCHUNK).unwrap();
-        remain -= FILLCHUNK.len();
+    while remain >= fillchunk.len() {
+        file.write_all(fillchunk).unwrap();
+        remain -= fillchunk.len();
     }
     file.flush().unwrap();
     unsafe { libc::sync() };
@@ -151,6 +148,16 @@ fn speedtest_testfunc(fvec: &mut MmapMut, rndvec: &[usize], readwrite: bool, asy
 }
 
 fn create_files(filesize: u64, threadnums: u64) -> Option<f64> {
+    let mut filldata = [0u8; 128 * 1024];
+    let mut fillchunk = [0u8; CHUNKSIZE as usize];
+    let mut rng = rand::thread_rng();
+    for d in &mut filldata {
+        *d = rng.gen();
+    }
+    for d in &mut fillchunk {
+        *d = rng.gen();
+    }
+
     // create files for tests
     let mut children = vec![];
     for i in 0..threadnums {
@@ -159,12 +166,12 @@ fn create_files(filesize: u64, threadnums: u64) -> Option<f64> {
             let dirfilename = format!("{DIRNAME}/{FILENAME}-{i:06}");
             if let Ok(file) = File::options().read(true).write(true).open(&dirfilename) {
                 if file.metadata().unwrap().len() != filesize {
-                    newfile(&dirfilename, filesize);
+                    newfile(&dirfilename, filesize, &filldata, &fillchunk);
                 }
             } else {
                 unsafe { libc::sync() };
                 let start = time::Instant::now();
-                newfile(&dirfilename, filesize);
+                newfile(&dirfilename, filesize, &filldata, &fillchunk);
                 let difftime = time::Instant::now() - start;
                 mbps = filesize as f64 / 1024. / 1024. / difftime.as_micros() as f64 * 1_000_000.;
             };

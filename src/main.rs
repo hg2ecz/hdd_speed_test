@@ -115,11 +115,11 @@ fn speedtest_testfunc(fvec: &mut MmapMut, rndvec: &[usize], readwrite: bool, asy
         for &rndnum in rndvec {
             let fill = ((rndnum as u32) << 4) + 1;
             for i in 0..chunkusize / 4 {
-                let stval = ((fvec[rndnum * chunkusize + 4 * i] as u32) << 24)
+                let stval = (((fvec[rndnum * chunkusize + 4 * i] as u32) << 24)
                     + ((fvec[rndnum * chunkusize + 4 * i + 1] as u32) << 16)
                     + ((fvec[rndnum * chunkusize + 4 * i + 2] as u32) << 8)
-                    + (fvec[rndnum * chunkusize + 4 * i + 3] as u32)
-                    + fill;
+                    + (fvec[rndnum * chunkusize + 4 * i + 3] as u32))
+                    .wrapping_add(fill);
                 fvec[rndnum * chunkusize + 4 * i] = (stval >> 24) as u8;
                 fvec[rndnum * chunkusize + 4 * i + 1] = (stval >> 16) as u8;
                 fvec[rndnum * chunkusize + 4 * i + 2] = (stval >> 8) as u8;
